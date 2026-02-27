@@ -1,0 +1,31 @@
+name: daily-news
+description: "Morning intelligence briefing — AI, SaaS, MarTech, FinTech, VC/Funding, and key people to watch."
+
+trigger:
+  cron_daily: "0 6 * * *"       # America/Los_Angeles — 6:00 AM daily
+  command: "/digest news"        # on-demand flash
+
+destination:
+  chat_id: "-1003825097801"
+  thread_id: 452
+
+prompts:
+  daily: "prompts/daily-news.md"
+  flash: "prompts/daily-news.md"
+
+model: claude-haiku-4-5-20251001
+max_tokens: 4096
+
+searches:
+  - "AI agents autonomous systems news today"
+  - "OpenAI ChatGPT news today"
+  - "Anthropic Claude news today"
+  - "Google Gemini DeepMind news today"
+  - "Meta Llama AI news today"
+  - "Braze Klaviyo Salesforce MarTech news today"
+  - "Postscript Bloomreach Bluecore Cordial news today"
+  - "Sierra AI Decagon AI customer service news today"
+  - "Chewy news today"
+  - "Sara Friar Sam Altman Garry Tan Jason Lemkin Bill Gurley news today"
+  - "startup funding deals VC SaaS AI today"
+  - "FinTech payments news today"
