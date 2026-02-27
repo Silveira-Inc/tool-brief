@@ -1,0 +1,13 @@
+name: birthdays
+description: "Daily birthday check from CRM. Sends one message per contact (score > 30) with humanized message and action buttons."
+
+trigger:
+  cron_daily: "0 7 * * *"         # America/Los_Angeles — 7:00 AM daily
+  command: "/digest birthdays"    # on-demand
+
+destination:
+  chat_id: "-1003825097801"
+  thread_id: 184                  # Personal CRM topic
+
+min_score: 30                     # Only alert for contacts with score above this
+model: claude-haiku-4-5-20251001
