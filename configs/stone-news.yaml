@@ -1,6 +1,11 @@
 name: stone-news
 description: "Board-level FinTech/LatAm intelligence for Antonio Silveira. Daily flash + weekly digest."
 
+# AI model to use for this module. Overrides engine default.
+# Options: claude-haiku-4-5-20251001 | claude-3-5-sonnet-20241022 | (any Anthropic model ID)
+model: claude-haiku-4-5-20251001
+max_tokens: 4096
+
 trigger:
   cron_daily: "15 6 * * *"       # America/Los_Angeles — daily flash
   cron_weekly: "0 17 * * 5"      # America/Los_Angeles — Friday weekly digest

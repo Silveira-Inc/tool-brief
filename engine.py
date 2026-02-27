@@ -127,7 +127,12 @@ def run_searches(queries: list[str], brave_key: str, delay: float = 1.0) -> str:
 
 # ── AI generation ─────────────────────────────────────────────────────────────
 
-def call_claude(prompt: str, search_context: str, api_key: str) -> str:
+DEFAULT_MODEL      = "claude-haiku-4-5-20251001"
+DEFAULT_MAX_TOKENS = 4096
+
+
+def call_claude(prompt: str, search_context: str, api_key: str,
+                model: str = DEFAULT_MODEL, max_tokens: int = DEFAULT_MAX_TOKENS) -> str:
     """Call Claude with the prompt + search results. Returns generated text."""
     now = datetime.now(tz=TZ)
     date_str = now.strftime("%B %d, %Y")
@@ -143,8 +148,8 @@ def call_claude(prompt: str, search_context: str, api_key: str) -> str:
             "content-type": "application/json",
         },
         json={
-            "model": "claude-3-haiku-20240307",
-            "max_tokens": 4096,
+            "model": model,
+            "max_tokens": max_tokens,
             "messages": [{"role": "user", "content": full_prompt}],
         },
         timeout=60,
@@ -225,9 +230,11 @@ def main():
     search_context = run_searches(queries, brave_key, delay=1.2)
     print(f"   Search context: {len(search_context)} chars\n")
 
-    # Generate content
-    print("🤖 Generating content with Claude...")
-    content = call_claude(prompt, search_context, api_key)
+    # Generate content (model from config, with fallback to engine default)
+    model      = config.get("model", DEFAULT_MODEL)
+    max_tokens = config.get("max_tokens", DEFAULT_MAX_TOKENS)
+    print(f"🤖 Generating content with Claude ({model})...")
+    content = call_claude(prompt, search_context, api_key, model=model, max_tokens=max_tokens)
     print(f"   Generated: {len(content)} chars\n")
 
     # Deliver
