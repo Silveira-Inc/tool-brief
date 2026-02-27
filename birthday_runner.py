@@ -171,7 +171,8 @@ Rules:
 - Include 1-2 birthday emojis naturally (🎂 🎉 🥂 🎈)
 - Reference something personal/professional if context allows
 - No AI vocabulary: no "I hope this message finds you", "wishing you all the best", "leverage", "foster", "crucial", "ensure"
-- No "Happy Birthday [Name]!" as the opener — be more creative
+- No em dashes (— or –). Use a comma or period instead.
+- No "Happy Birthday [Name]!" as the opener. Be more creative.
 - Sound like Antonio — warm but concise, CTO energy
 - Return ONLY the message text, nothing else"""
 
@@ -210,42 +211,40 @@ def send_birthday_message(contact: dict, message: str, chat_id: str,
     phone_raw  = contact.get("phone")
     phone      = normalize_phone(phone_raw)
 
-    # Build birthday year display
+    # Build birthday date label
     bday = contact.get("birthday", "")
-    bday_display = ""
+    bday_label = ""
+    age_str = ""
     if bday:
         try:
             year = int(bday[:4])
-            mmdd = bday[5:]
+            month, day = int(bday[5:7]), int(bday[8:10])
+            from datetime import datetime as _dt
+            bday_label = _dt(2000, month, day).strftime("%B %d")  # e.g. "February 28"
             if year > 1800:
-                today_year = date.today().year
-                age = today_year - year
-                bday_display = f" · 🎂 Turns {age} today"
-            else:
-                bday_display = ""
+                age_str = f", turns {date.today().year - year}"
         except Exception:
             pass
 
-    # Context line
-    context_parts = []
+    # Position line
+    position_parts = []
     if role and company:
-        context_parts.append(f"{role} at {company}")
+        position_parts.append(f"{role} at {company}")
     elif company:
-        context_parts.append(company)
-    context_line = " · ".join(filter(None, [
-        html_escape(", ".join(context_parts)),
-        f"Score {score}/100",
-        f"Last contact: {last_touch}{bday_display}",
-    ]))
+        position_parts.append(company)
+    position_str = html_escape(", ".join(position_parts))
 
-    # Phone line — tappable on iPhone (opens iMessage/Phone)
+    # Phone line — tappable on iPhone
     phone_line = ""
     if phone:
         phone_line = f"\n📱 <a href=\"{tel_url(phone)}\">{html_escape(phone_raw or phone)}</a>"
 
     text = (
-        f"🎂 <b>{html_escape(name)}</b> has a birthday today\n"
-        f"<i>{context_line}</i>{phone_line}\n\n"
+        f"🎂 <b>{html_escape(name)}</b>\n"
+        f"<i>{position_str + ' · ' if position_str else ''}"
+        f"{bday_label}{age_str} · Score {score}/100</i>\n"
+        f"<i>Last contact: {last_touch}</i>"
+        f"{phone_line}\n\n"
         f"{html_escape(message)}"
     )
 
