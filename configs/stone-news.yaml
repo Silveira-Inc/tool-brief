@@ -1,0 +1,34 @@
+name: stone-news
+description: "Board-level FinTech/LatAm intelligence for Antonio Silveira. Daily flash + weekly digest."
+
+trigger:
+  cron_daily: "15 6 * * *"       # America/Los_Angeles — daily flash
+  cron_weekly: "0 17 * * 5"      # America/Los_Angeles — Friday weekly digest
+  command: "/digest stone-news"   # on-demand flash
+
+destination:
+  chat_id: "-1003825097801"
+  thread_id: 8
+
+prompts:
+  daily: "prompts/stone-news-daily.md"
+  weekly: "prompts/stone-news-weekly.md"
+  flash: "prompts/stone-news-daily.md"   # on-demand uses daily prompt
+
+searches:
+  - "FinTech Latin America news today"
+  - "Nubank Mercado Pago PagSeguro news today"
+  - "Brazil digital banking payments regulation today"
+  - "BNPL neobank Latin America news today"
+  - "Banco Central do Brasil Pix Open Finance news"
+  - "NU MELI PAGS STNE earnings news"
+
+searches_weekly:
+  - "FinTech Latin America news this week"
+  - "Nubank Mercado Pago PagSeguro news this week"
+  - "Brazil digital banking regulation this week"
+  - "BNPL neobank Latin America funding deals this week"
+  - "Banco Central do Brasil Pix Open Finance this week"
+  - "NU MELI PAGS STNE earnings analyst this week"
+  - "cross-border payments Latin America this week"
+  - "InfinityPay PicPay Neon Inter C6 Bank news this week"
