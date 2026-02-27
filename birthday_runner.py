@@ -9,8 +9,9 @@ Sends one Telegram message per contact to the CRM topic with:
   - 💬 iMessage button (pre-filled, if phone available)
 
 Usage:
-  python birthday_runner.py                  # run for today
-  python birthday_runner.py --test-date 09-06   # run for a specific MM-DD (testing)
+  python birthday_runner.py                        # run for today
+  python birthday_runner.py --test-date 09-06      # run for a specific MM-DD (testing)
+  python birthday_runner.py --next-days 30         # run for all birthdays in next N days
 """
 
 import json
@@ -92,7 +93,7 @@ def get_birthday_contacts(db_path: Path, mmdd: str, min_score: int) -> list[dict
           AND c.birthday != ''
           AND substr(c.birthday, 6, 5) = ?
           AND c.score > ?
-        GROUP BY c.email          -- deduplicate contacts imported from multiple sources
+        GROUP BY c.name, substr(c.birthday, 6, 5)   -- deduplicate same person across multiple email entries
         ORDER BY c.score DESC
     """, (mmdd, min_score))
 
@@ -273,66 +274,104 @@ def send_birthday_message(contact: dict, message: str, chat_id: str,
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def main():
-    # Parse --test-date MM-DD flag
-    test_date = None
-    if "--test-date" in sys.argv:
-        idx = sys.argv.index("--test-date")
-        if idx + 1 < len(sys.argv):
-            test_date = sys.argv[idx + 1]
+def get_date_range(start: date, days: int) -> list[str]:
+    """Return list of MM-DD strings for the next N days starting from start."""
+    from datetime import timedelta
+    return [(start + timedelta(days=i)).strftime("%m-%d") for i in range(days)]
 
-    today     = date.today()
-    mmdd      = test_date or today.strftime("%m-%d")
-    now_str   = datetime.now(tz=TZ).strftime("%Y-%m-%d %H:%M %Z")
 
-    print(f"🎂 Birthday Runner — {now_str}")
-    print(f"   Checking birthdays for: {mmdd}{'  [TEST DATE]' if test_date else ''}\n")
-
-    config    = load_config()
-    api_key   = get_anthropic_key()
-    bot_token = get_telegram_token()
-
+def run_for_date(mmdd: str, label: str, config: dict, api_key: str,
+                 bot_token: str) -> tuple[int, int]:
+    """Process one date. Returns (sent, total)."""
     chat_id   = config["destination"]["chat_id"]
     thread_id = config["destination"]["thread_id"]
     min_score = config.get("min_score", 30)
     model     = config.get("model", "claude-haiku-4-5-20251001")
 
-    # Query CRM
-    print(f"🔍 Querying CRM DB (score > {min_score}, birthday = {mmdd})...")
     contacts = get_birthday_contacts(CRM_DB, mmdd, min_score)
-    print(f"   Found {len(contacts)} contact(s)\n")
-
     if not contacts:
-        print("✅ No birthdays today above score threshold — nothing to send.")
-        return
+        return 0, 0
 
-    # Process each contact
+    print(f"\n📅 {label} ({mmdd}) — {len(contacts)} contact(s)")
     sent = 0
     for i, contact in enumerate(contacts, 1):
         name = contact.get("name", "Unknown")
         print(f"  [{i}/{len(contacts)}] {name} (score: {contact.get('score')})")
-        print(f"    Generating message...")
-
         try:
             message = generate_birthday_message(contact, api_key, model)
-            print(f"    Message: {message[:80]}...")
+            print(f"    → {message[:80]}...")
         except Exception as e:
-            print(f"    ⚠️  AI generation failed: {e}")
-            message = f"🎉 Happy Birthday {contact.get('preferred_name') or name.split()[0]}! Hope you have a great day 🎂"
+            print(f"    ⚠️  AI failed: {e}")
+            first = contact.get("preferred_name") or name.split()[0]
+            message = f"🎉 Happy Birthday {first}! Hope you have a great day 🎂"
 
         time.sleep(0.5)
-
         ok = send_birthday_message(contact, message, chat_id, thread_id, bot_token)
         if ok:
             sent += 1
             print(f"    ✅ Sent")
         else:
-            print(f"    ❌ Failed to send")
+            print(f"    ❌ Failed")
+        time.sleep(1.2)
 
-        time.sleep(1.2)   # rate limit
+    return sent, len(contacts)
+
+
+def main():
+    today   = date.today()
+    now_str = datetime.now(tz=TZ).strftime("%Y-%m-%d %H:%M %Z")
+
+    # Parse flags
+    test_date = None
+    next_days = None
+
+    if "--test-date" in sys.argv:
+        idx = sys.argv.index("--test-date")
+        if idx + 1 < len(sys.argv):
+            test_date = sys.argv[idx + 1]
+
+    if "--next-days" in sys.argv:
+        idx = sys.argv.index("--next-days")
+        if idx + 1 < len(sys.argv):
+            next_days = int(sys.argv[idx + 1])
+
+    config    = load_config()
+    api_key   = get_anthropic_key()
+    bot_token = get_telegram_token()
+
+    # ── Mode: next N days ─────────────────────────────────────────────────────
+    if next_days:
+        print(f"🎂 Birthday Runner — {now_str}")
+        print(f"   Scanning next {next_days} days for birthdays...\n")
+
+        from datetime import timedelta
+        total_sent = total_found = 0
+        for i in range(next_days):
+            d     = today + timedelta(days=i)
+            mmdd  = d.strftime("%m-%d")
+            label = d.strftime("%B %d") + (" (today)" if i == 0 else f" (+{i}d)")
+            sent, found = run_for_date(mmdd, label, config, api_key, bot_token)
+            total_sent  += sent
+            total_found += found
+
+        print(f"\n{'='*50}")
+        print(f"🎂 Done — {total_sent}/{total_found} messages sent across next {next_days} days")
+        return
+
+    # ── Mode: single date (today or --test-date) ──────────────────────────────
+    mmdd    = test_date or today.strftime("%m-%d")
+    label   = "TEST DATE" if test_date else "today"
+    print(f"🎂 Birthday Runner — {now_str}")
+    print(f"   Checking birthdays for: {mmdd}  [{label}]\n")
+
+    sent, found = run_for_date(mmdd, label, config, api_key, bot_token)
+
+    if not found:
+        print("✅ No birthdays today above score threshold — nothing to send.")
+        return
 
     print(f"\n{'='*50}")
-    print(f"🎂 Sent {sent}/{len(contacts)} birthday messages to topic {thread_id}")
+    print(f"🎂 Sent {sent}/{found} birthday messages to topic {config['destination']['thread_id']}")
 
 
 if __name__ == "__main__":
