@@ -6,6 +6,10 @@ description: "Board-level FinTech/LatAm intelligence for Antonio Silveira. Daily
 model: claude-haiku-4-5-20251001
 max_tokens: 4096
 
+github_archive:
+  enabled: true
+  repo_path: "/Users/antonio/dev/Agents/projects/tool-intel"
+
 trigger:
   cron_daily: "15 6 * * *"       # America/Los_Angeles — daily flash
   cron_weekly: "0 17 * * 5"      # America/Los_Angeles — Friday weekly digest

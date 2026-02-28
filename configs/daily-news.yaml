@@ -16,6 +16,10 @@ prompts:
 model: claude-haiku-4-5-20251001
 max_tokens: 4096
 
+github_archive:
+  enabled: true
+  repo_path: "/Users/antonio/dev/Agents/projects/tool-intel"
+
 searches:
   - "AI agents autonomous systems news today"
   - "OpenAI ChatGPT news today"

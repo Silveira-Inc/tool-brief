@@ -17,6 +17,7 @@ Examples:
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -193,6 +194,63 @@ def send_telegram(text: str, chat_id: str, thread_id: int, bot_token: str) -> bo
     return True
 
 
+def archive_to_github(content: str, module_name: str, run_type: str, repo_path: str) -> None:
+    """Archive the generated brief into the local tool-intel repo and push it."""
+    try:
+        repo_dir = Path(repo_path).expanduser()
+        now = datetime.now(tz=TZ)
+        today = now.strftime("%Y-%m-%d")
+        iso_year, iso_week, _ = now.isocalendar()
+
+        # Match the requested archive layout: daily briefs live in intel/, weekly digests in digests/.
+        if run_type == "weekly":
+            archive_rel_path = Path("digests") / f"{iso_year}-W{iso_week:02d}-{module_name}.md"
+        else:
+            archive_rel_path = Path("intel") / f"{today}-{module_name}.md"
+
+        archive_path = repo_dir / archive_rel_path
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        archive_path.write_text(content.rstrip() + "\n", encoding="utf-8")
+
+        readme_path = repo_dir / "README.md"
+        readme_text = readme_path.read_text(encoding="utf-8")
+
+        # Replace only the Latest Brief section and preserve the rest of the README as-is.
+        latest_section = f"## Latest Brief\n\n{content.rstrip()}\n"
+        updated_readme = re.sub(
+            r"## Latest Brief\n.*?(?=\n---\n|$)",
+            latest_section,
+            readme_text,
+            count=1,
+            flags=re.DOTALL,
+        )
+        if updated_readme == readme_text:
+            updated_readme = readme_text.rstrip() + f"\n\n{latest_section}"
+        readme_path.write_text(updated_readme, encoding="utf-8")
+
+        commit_message = f"intel: add {module_name} {run_type} brief for {today}"
+
+        # Use git via subprocess so archiving stays independent from the main app flow.
+        git_commands = [
+            ["git", "add", str(archive_rel_path), "README.md"],
+            ["git", "commit", "-m", commit_message],
+            ["git", "push", "origin", "main"],
+        ]
+        for command in git_commands:
+            subprocess.run(
+                command,
+                cwd=repo_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        print(f"📚 Archived brief to GitHub: {archive_rel_path}")
+    except Exception as exc:
+        # Archiving is explicitly best-effort and must never block Telegram delivery.
+        print(f"  ⚠️  GitHub archive failed: {exc}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -241,6 +299,10 @@ def main():
     print(f"📤 Sending to Telegram (chat={chat_id}, thread={thread_id})...")
     ok = send_telegram(content, chat_id, thread_id, bot_token)
     if ok:
+        github_archive = config.get("github_archive", {})
+        if github_archive.get("enabled"):
+            print("📚 Archiving brief to GitHub...")
+            archive_to_github(content, module_name, run_type, github_archive["repo_path"])
         print("✅ Done!")
     else:
         print("❌ Delivery failed")
