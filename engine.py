@@ -376,6 +376,24 @@ def main():
         }))
         return
 
+    # ── Send-file mode: agent writes content to a file, script sends it ───────
+    if "--send-file" in sys.argv:
+        idx = sys.argv.index("--send-file")
+        file_path = sys.argv[idx + 1]
+        content   = Path(file_path).read_text(encoding="utf-8").strip()
+        bot_token = get_telegram_token()
+        print(f"📤 Sending to Telegram (chat={chat_id}, thread={thread_id})...", file=sys.stderr)
+        ok = send_telegram(content, chat_id, thread_id, bot_token)
+        if ok:
+            github_archive = config.get("github_archive", {})
+            if github_archive.get("enabled"):
+                archive_to_github(content, module_name, run_type, github_archive["repo_path"])
+            print("✅ Sent.", file=sys.stderr)
+        else:
+            print("❌ Delivery failed", file=sys.stderr)
+            sys.exit(1)
+        return
+
     # ── Legacy mode: generate + deliver (kept for manual/debug runs) ──────────
     api_key   = get_anthropic_key()
     bot_token = get_telegram_token()
