@@ -5,56 +5,55 @@ Compile a morning intelligence briefing from the search results provided below.
 **People:** Sara Friar (OpenAI CFO), Jason Lemkin, Bill Gurley, Sam Altman, Garry Tan, Jason Calacanis
 **Companies:** OpenAI, Anthropic, Google/Gemini, Meta/Llama, Amazon, Microsoft, Chewy, Braze, Klaviyo, Postscript, Bloomreach, Bluecore, Cordial, Salesforce, Sierra AI, Decagon
 
-## Output Format — Telegram HTML only (no Markdown)
+## Output Format — Telegram Markdown (not HTML)
 
 ---
-📰 <b>DAILY NEWS BRIEFING — {date}</b>
+📰 *DAILY NEWS BRIEFING — {date}*
 
-🔥 <b>TOP SIGNALS TODAY</b> <i>(covered by 3+ sources)</i>
-1. <a href="URL">Headline</a> — <i>Source · Date</i>
+🔥 *TOP SIGNALS TODAY* _(covered by 3+ sources)_
+1. [Headline](URL) — _Source · Date_
 2-3 sentence summary.
 (omit section if no story has 3+ source coverage)
 
-🤖 <b>AI &amp; AGENTS</b>
-• <a href="URL">Headline</a> — <i>Source · Date</i>
+🤖 *AI & AGENTS*
+• [Headline](URL) — _Source · Date_
 1-2 sentence summary.
 
-💬 <b>OPENAI</b>
-• <a href="URL">Headline</a> — <i>Source · Date</i>
+💬 *OPENAI*
+• [Headline](URL) — _Source · Date_
 1-2 sentence summary.
 
-🧠 <b>ANTHROPIC</b>
-• <a href="URL">Headline</a> — <i>Source · Date</i>
+🧠 *ANTHROPIC*
+• [Headline](URL) — _Source · Date_
 1-2 sentence summary.
 
-🔍 <b>GOOGLE / GEMINI</b>
-• <a href="URL">Headline</a> — <i>Source · Date</i>
+🔍 *GOOGLE / GEMINI*
+• [Headline](URL) — _Source · Date_
 1-2 sentence summary.
 
-🦙 <b>META / LLAMA</b>
-• <a href="URL">Headline</a> — <i>Source · Date</i>
+🦙 *META / LLAMA*
+• [Headline](URL) — _Source · Date_
 1-2 sentence summary.
 
-📣 <b>MARTECH</b>
-• <a href="URL">Company — Headline</a> — <i>Source · Date</i>
+📣 *MARTECH*
+• [Company — Headline](URL) — _Source · Date_
 1-2 sentence summary.
 
-👥 <b>PEOPLE TO WATCH</b>
-• <a href="URL">Name</a> (Title): 1-2 sentence summary — <i>Source · Date</i>
+👥 *PEOPLE TO WATCH*
+• [Name](URL) (Title): 1-2 sentence summary — _Source · Date_
 
-💰 <b>FUNDING &amp; DEALS</b>
-• <a href="URL">Company</a>: round, investor, what they do — <i>Source · Date</i>
+💰 *FUNDING & DEALS*
+• [Company](URL): round, investor, what they do — _Source · Date_
 
-📚 <b>RECOMMENDED READS</b>
-• <a href="URL">Title</a> — <i>Source</i> — 1-sentence description.
+📚 *RECOMMENDED READS*
+• [Title](URL) — _Source_ — 1-sentence description.
 ---
 
 ## Rules
-- Every bullet must have an HTML hyperlink <a href="URL">text</a> — no exceptions
-- Use Telegram HTML format — NOT Markdown
-- Escape special chars: &amp; for &, &lt; for <, &gt; for >
+- Every bullet must have a Markdown hyperlink [text](URL) — no exceptions
+- Use Telegram Markdown format — NOT HTML
 - TOP SIGNALS = stories covered by 3+ sources — skip section entirely if none qualify
 - Prefer stories from last 24-48 hours; flag older stories with their date
-- If no news for a section, write: <i>No significant news today.</i>
+- If no news for a section, write: _No significant news today._
 - Be factual, no editorializing
 - Do not invent stories — only use what's in the search results provided

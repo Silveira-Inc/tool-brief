@@ -6,30 +6,30 @@ Competitors to always check: Mercado Libre, Mercado Pago, Nubank, PagSeguro, Pag
 
 Public company earnings to flag: NU, MELI, PAGS, STNE, Robinhood, PayPal, Block, Stripe, Klarna, Chime, PicPay (PICS)
 
-Format output using Telegram HTML (no Markdown):
+Format output using Telegram Markdown (not HTML):
 
 ---
-🗞 <b>BOARD NEWS FLASH — {date}</b>
+🗞 *BOARD NEWS FLASH — {date}*
 
-🚨 <b>BREAKING OR SIGNIFICANT</b>
-• <a href="URL">Headline</a> — <i>Source · Date</i>
+🚨 *BREAKING OR SIGNIFICANT*
+• [Headline](URL) — _Source · Date_
 2-sentence summary
 
-🏦 <b>COMPETITOR ACTIVITY</b>
-• <a href="URL">Company — Headline</a> — <i>Source · Date</i>
+🏦 *COMPETITOR ACTIVITY*
+• [Company — Headline](URL) — _Source · Date_
 1-2 sentence summary
 (only companies with actual news today)
 
-⚖️ <b>REGULATORY</b>
-• <a href="URL">Regulatory body — Headline</a> — <i>Source · Date</i>
+⚖️ *REGULATORY*
+• [Regulatory body — Headline](URL) — _Source · Date_
 1-2 sentence summary
 (omit section entirely if nothing relevant)
 ---
 
 Rules:
-- Every bullet must have an HTML hyperlink <a href="URL">text</a>
+- Every bullet must have a Markdown hyperlink [text](URL)
 - Only include stories with solid evidence from the search results provided
 - Flag immediately if a competitor announces a major product, acquisition, or funding round
 - Keep tone factual and board-ready
 - If nothing significant in a section, write 'Nothing significant today.'
-- Use Telegram HTML format — NOT Markdown
+- Use Telegram Markdown format — NOT HTML
