@@ -108,7 +108,7 @@ def web_search(query: str, brave_key: str, count: int = 8) -> list[dict]:
         results = resp.json().get("web", {}).get("results", [])
         return [{"title": r.get("title", ""), "url": r.get("url", ""), "description": r.get("description", "")} for r in results]
     except Exception as e:
-        print(f"  ⚠️  Search failed for '{query}': {e}")
+        print(f"  ⚠️  Search failed for '{query}': {e}", file=sys.stderr)
         return []
 
 
@@ -116,7 +116,7 @@ def run_searches(queries: list[str], brave_key: str, delay: float = 1.0) -> str:
     """Run all searches and compile results into a single context string."""
     all_results = []
     for i, query in enumerate(queries):
-        print(f"  🔍 [{i+1}/{len(queries)}] {query}")
+        print(f"  🔍 [{i+1}/{len(queries)}] {query}", file=sys.stderr)
         results = web_search(query, brave_key)
         for r in results:
             all_results.append(f"• [{r['title']}]({r['url']})\n  {r['description']}")
@@ -161,8 +161,78 @@ def call_claude(prompt: str, search_context: str, api_key: str,
 
 # ── Telegram delivery ─────────────────────────────────────────────────────────
 
+def sanitize_html(text: str) -> str:
+    """
+    Fix malformed HTML for Telegram using a stack-based parser.
+    Telegram supports: b, i, u, s, a, code, pre, tg-spoiler.
+    Any unclosed or mismatched tags are auto-closed or dropped.
+    """
+    ALLOWED_TAGS = {"b", "i", "u", "s", "a", "code", "pre", "tg-spoiler"}
+    stack: list[str] = []
+    result: list[str] = []
+    i = 0
+    n = len(text)
+
+    while i < n:
+        if text[i] != "<":
+            result.append(text[i])
+            i += 1
+            continue
+
+        end = text.find(">", i)
+        if end == -1:
+            # Unclosed bracket — escape it
+            result.append("&lt;")
+            i += 1
+            continue
+
+        raw = text[i + 1 : end]
+
+        if raw.startswith("/"):
+            # Closing tag
+            tag_name = raw[1:].strip().split()[0].lower() if raw[1:].strip() else ""
+            if tag_name in ALLOWED_TAGS and stack and stack[-1] == tag_name:
+                stack.pop()
+                result.append(f"</{tag_name}>")
+            # else: mismatched/orphan close tag — drop it
+        elif raw.startswith("!") or raw.startswith("?"):
+            pass  # comments / PI — drop
+        else:
+            parts = raw.split(None, 1)
+            if not parts:
+                i = end + 1
+                continue
+            tag_name = parts[0].lower().rstrip("/")
+            attrs_raw = parts[1] if len(parts) > 1 else ""
+            self_closing = raw.rstrip().endswith("/")
+
+            if tag_name in ALLOWED_TAGS:
+                if tag_name == "a":
+                    href_m = re.search(r'href=["\']([^"\']*)["\']', attrs_raw)
+                    if href_m:
+                        url = href_m.group(1)
+                        result.append(f'<a href="{url}">')
+                        if not self_closing:
+                            stack.append("a")
+                    # else: malformed <a> with no href — drop it
+                else:
+                    result.append(f"<{tag_name}>")
+                    if not self_closing:
+                        stack.append(tag_name)
+            # unknown/disallowed tags are dropped
+
+        i = end + 1
+
+    # Auto-close any still-open tags in reverse order
+    for tag in reversed(stack):
+        result.append(f"</{tag}>")
+
+    return "".join(result)
+
+
 def send_telegram(text: str, chat_id: str, thread_id: int, bot_token: str) -> bool:
     """Send message to Telegram. Splits if > 4000 chars."""
+    text = sanitize_html(text)
     MAX_LEN = 4000
     chunks = []
     while len(text) > MAX_LEN:
@@ -260,52 +330,70 @@ def main():
 
     module_name = sys.argv[1]
     run_type    = sys.argv[2].lower()   # daily | weekly | flash
+    data_only   = "--data-only" in sys.argv
 
     if run_type not in ("daily", "weekly", "flash"):
         sys.exit(f"❌ Unknown run_type '{run_type}'. Use: daily | weekly | flash")
 
-    print(f"🗞  agent-brief-mac — {module_name} / {run_type}")
-    print(f"   {datetime.now(tz=TZ).strftime('%Y-%m-%d %H:%M %Z')}\n")
+    print(f"🗞  agent-brief-mac — {module_name} / {run_type}", file=sys.stderr)
+    print(f"   {datetime.now(tz=TZ).strftime('%Y-%m-%d %H:%M %Z')}\n", file=sys.stderr)
 
-    # Load config and credentials
-    config     = load_module_config(module_name)
-    brave_key  = get_brave_key()
-    api_key    = get_anthropic_key()
-    bot_token  = get_telegram_token()
+    # Load config
+    config    = load_module_config(module_name)
+    brave_key = get_brave_key()
 
     chat_id   = config["destination"]["chat_id"]
     thread_id = config["destination"]["thread_id"]
+    model      = config.get("model", DEFAULT_MODEL)
+    max_tokens = config.get("max_tokens", DEFAULT_MAX_TOKENS)
 
     # Select prompt and search queries
     prompt_path = config["prompts"].get(run_type) or config["prompts"]["daily"]
-    prompt      = load_prompt(prompt_path)
+    prompt_raw  = load_prompt(prompt_path)
+
+    # Substitute date placeholder
+    date_str    = datetime.now(tz=TZ).strftime("%B %d, %Y")
+    prompt_text = prompt_raw.replace("{date}", date_str)
 
     queries_key = "searches_weekly" if run_type == "weekly" else "searches"
     queries     = config.get(queries_key) or config.get("searches", [])
 
     # Run searches
-    print(f"🔍 Running {len(queries)} searches...")
+    print(f"🔍 Running {len(queries)} searches...", file=sys.stderr)
     search_context = run_searches(queries, brave_key, delay=1.2)
-    print(f"   Search context: {len(search_context)} chars\n")
+    print(f"   Search context: {len(search_context)} chars\n", file=sys.stderr)
 
-    # Generate content (model from config, with fallback to engine default)
-    model      = config.get("model", DEFAULT_MODEL)
-    max_tokens = config.get("max_tokens", DEFAULT_MAX_TOKENS)
-    print(f"🤖 Generating content with Claude ({model})...")
-    content = call_claude(prompt, search_context, api_key, model=model, max_tokens=max_tokens)
-    print(f"   Generated: {len(content)} chars\n")
+    if data_only:
+        # Output JSON for the cron agent — no Claude call, no Telegram send
+        print(json.dumps({
+            "module":         module_name,
+            "run_type":       run_type,
+            "prompt_text":    prompt_text,
+            "search_context": search_context,
+            "destination":    {"chat_id": chat_id, "thread_id": int(thread_id)},
+            "model":          model,
+            "max_tokens":     max_tokens,
+        }))
+        return
 
-    # Deliver
-    print(f"📤 Sending to Telegram (chat={chat_id}, thread={thread_id})...")
+    # ── Legacy mode: generate + deliver (kept for manual/debug runs) ──────────
+    api_key   = get_anthropic_key()
+    bot_token = get_telegram_token()
+
+    print(f"🤖 Generating content with Claude ({model})...", file=sys.stderr)
+    content = call_claude(prompt_text, search_context, api_key, model=model, max_tokens=max_tokens)
+    print(f"   Generated: {len(content)} chars\n", file=sys.stderr)
+
+    print(f"📤 Sending to Telegram (chat={chat_id}, thread={thread_id})...", file=sys.stderr)
     ok = send_telegram(content, chat_id, thread_id, bot_token)
     if ok:
         github_archive = config.get("github_archive", {})
         if github_archive.get("enabled"):
-            print("📚 Archiving brief to GitHub...")
+            print("📚 Archiving brief to GitHub...", file=sys.stderr)
             archive_to_github(content, module_name, run_type, github_archive["repo_path"])
-        print("✅ Done!")
+        print("✅ Done!", file=sys.stderr)
     else:
-        print("❌ Delivery failed")
+        print("❌ Delivery failed", file=sys.stderr)
         sys.exit(1)
 
 
