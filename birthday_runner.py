@@ -334,6 +334,46 @@ def main():
         if idx + 1 < len(sys.argv):
             next_days = int(sys.argv[idx + 1])
 
+    # ── Mode: data only (no LLM, no Telegram — outputs contacts JSON) ────────
+    if "--data-only" in sys.argv:
+        mmdd   = test_date or today.strftime("%m-%d")
+        config = load_config()
+        contacts = get_birthday_contacts(CRM_DB, mmdd, config.get("min_score", 30))
+        print(json.dumps({
+            "contacts": [dict(c) for c in contacts],
+            "config": {
+                "destination": config["destination"],
+                "model": config.get("model", "claude-haiku-4-5-20251001"),
+                "min_score": config.get("min_score", 30),
+            },
+            "date": mmdd,
+        }, default=str))
+        return
+
+    # ── Mode: send pre-generated messages (no LLM) ───────────────────────────
+    if "--send-json" in sys.argv:
+        idx_arg   = sys.argv.index("--send-json")
+        file_path = Path(sys.argv[idx_arg + 1])
+        payload   = json.loads(file_path.read_text())
+        bot_token = get_telegram_token()
+        contacts  = payload["contacts"]
+        messages  = payload.get("messages", {})   # {"0": "msg", "1": "msg"}
+        cfg       = payload["config"]
+        chat_id   = cfg["destination"]["chat_id"]
+        thread_id = cfg["destination"]["thread_id"]
+        sent = 0
+        for i, contact in enumerate(contacts):
+            msg = (messages.get(str(i)) or "").strip()
+            if not msg:
+                first = contact.get("preferred_name") or contact.get("name", "").split()[0]
+                msg = f"🎉 Happy Birthday {first}! Hope you have a great day 🎂"
+            ok = send_birthday_message(contact, msg, chat_id, thread_id, bot_token)
+            if ok:
+                sent += 1
+            time.sleep(1.2)
+        print(f"✅ Sent {sent}/{len(contacts)} birthday messages")
+        return
+
     config    = load_config()
     api_key   = get_anthropic_key()
     bot_token = get_telegram_token()
